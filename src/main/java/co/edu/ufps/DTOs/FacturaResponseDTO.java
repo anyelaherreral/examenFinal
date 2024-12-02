@@ -6,6 +6,7 @@ import lombok.Data;
 
 @Data
 public class FacturaResponseDTO {
+	
     private double total;
     private double impuestos;
     private ClienteDTO cliente;
