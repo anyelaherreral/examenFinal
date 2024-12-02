@@ -13,7 +13,6 @@ public class FacturaResponseDTO {
     private List<ProductoDTO> productos;
     private CajeroDTO cajero;
 
-    // Getters y Setters
 
     // Inner classes para ClienteDTO, ProductoDTO y CajeroDTO
     public static class ClienteDTO {
@@ -21,7 +20,7 @@ public class FacturaResponseDTO {
         private String nombre;
         private String tipo_documento;
 
-        // Getters y Setters
+       
     }
 
     public static class ProductoDTO {
@@ -32,7 +31,7 @@ public class FacturaResponseDTO {
         private double descuento;
         private double subtotal;
 
-        // Getters y Setters
+      
     }
 
     public static class CajeroDTO {
