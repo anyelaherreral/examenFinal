@@ -14,15 +14,15 @@ public class FacturaResponseDTO {
     private CajeroDTO cajero;
 
 
-    // Inner classes para ClienteDTO, ProductoDTO y CajeroDTO
-    public static class ClienteDTO {
+    @Data
+ public static class ClienteDTO {
         private String documento;
         private String nombre;
         private String tipo_documento;
 
        
     }
-
+    @Data
     public static class ProductoDTO {
         private String referencia;
         private String nombre;
@@ -33,7 +33,7 @@ public class FacturaResponseDTO {
 
       
     }
-
+    @Data
     public static class CajeroDTO {
         private String documento;
         private String nombre;
