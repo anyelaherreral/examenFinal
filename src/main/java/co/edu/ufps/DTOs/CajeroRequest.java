@@ -6,5 +6,6 @@ import lombok.Data;
 
 @Data
 public class CajeroRequest {
-	private String documento;
+	private String token;
+	
 }

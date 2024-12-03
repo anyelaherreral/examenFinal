@@ -1,5 +1,6 @@
 package co.edu.ufps.entities;
 
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
 
@@ -33,7 +34,7 @@ public class Compra {
     private Integer impuestos;
     
     @Column(name = "fecha")
-    private Date fecha;
+    private LocalDate fecha;
     
     @Column(name = "observaciones", length = 100)
     private String observaciones;

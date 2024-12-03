@@ -6,5 +6,5 @@ import lombok.Data;
 
 @Data
 public class VendedorRequest {
-	 private String token;
+	private String documento;
 }
