@@ -6,9 +6,11 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import co.edu.ufps.DTOs.ClienteRequest;
 import co.edu.ufps.DTOs.FacturaRequest;
 import co.edu.ufps.entities.Cliente;
 import co.edu.ufps.entities.Compra;
+import co.edu.ufps.entities.TipoDocumento;
 import co.edu.ufps.repositories.CajeroRepository;
 import co.edu.ufps.repositories.ClienteRepository;
 import co.edu.ufps.repositories.CompraRepository;
@@ -38,9 +40,9 @@ public class ClienteService {
         throw new RuntimeException("Cliente no encontrado con el id: " + id);
     }
     
-    public Cliente getClienteByDocumento(String documento) {
-        return clienteRepository.findByDocumento(documento)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado con el documento: " + documento));
+    public Cliente getClienteByDocumentoAndTipoDocumento(String documento, String tipoDocumento) {
+        return clienteRepository.findByDocumentoAndTipoDocumento_Nombre(documento, tipoDocumento)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado con documento: " + documento + " y tipo de documento: " + tipoDocumento));
     }
 
     // Crear un nuevo cliente
@@ -68,4 +70,26 @@ public class ClienteService {
         }
         throw new RuntimeException("Cliente no encontrado con el id: " + id);
     }
+    
+    public Cliente buscarOCrearCliente(String documento, String tipoDocumento, ClienteRequest clienteRequest) {
+        return clienteRepository.findByDocumentoAndTipoDocumento_Nombre(documento, tipoDocumento)
+                .orElseGet(() -> {
+                    Cliente nuevoCliente = new Cliente();
+                    nuevoCliente.setDocumento(documento);
+                    nuevoCliente.setNombre(clienteRequest.getNombre());
+
+                    TipoDocumento tipoDoc = new TipoDocumento();
+                    tipoDoc.setNombre(tipoDocumento);
+                    nuevoCliente.setTipoDocumento(tipoDoc);
+
+                    return clienteRepository.save(nuevoCliente);
+                });
+    }
+    
+    public Cliente buscarClientePorDocumentoYTipo(String documento, String tipoDocumento) {
+        return clienteRepository.findByDocumentoAndTipoDocumento_Nombre(documento, tipoDocumento)
+                .orElseThrow(() -> new RuntimeException("Cliente no encontrado con documento: " 
+                                                        + documento + " y tipo: " + tipoDocumento));
+    }
+
 }

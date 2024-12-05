@@ -13,5 +13,5 @@ public class PagoRequest {
 	@JsonProperty("tipo_tarjeta")
     private String tipoTarjeta;
     private int cuotas;
-    private BigDecimal valor;
+    private Integer valor;
 }

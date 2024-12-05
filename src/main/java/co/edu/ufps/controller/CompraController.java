@@ -13,9 +13,11 @@ import co.edu.ufps.services.CompraService;
 import co.edu.ufps.services.FacturaService;
 import co.edu.ufps.services.TiendaService;
 import jakarta.persistence.EntityNotFoundException;
+import co.edu.ufps.DTOs.DataFactura;
 import co.edu.ufps.DTOs.FacturaRequest;
 import co.edu.ufps.DTOs.FacturaRequestDTO;
 import co.edu.ufps.DTOs.FacturaResponseDTO;
+import co.edu.ufps.DTOs.RespuestaApi;
 import co.edu.ufps.entities.Compra;
 import co.edu.ufps.entities.Tienda;
 
@@ -28,20 +30,30 @@ public class CompraController {
     TiendaService tiendaService;
 
 	@PostMapping("/crear/{uuid}")
-    public ResponseEntity<?> crearCompra(@PathVariable String uuid, @RequestBody FacturaRequest facturaRequest) {
-        try {
-        	Tienda tienda = tiendaService.buscarTiendaPorUuid(uuid);
-        	
-            // Llamar al servicio para crear la compra
-            Compra compra = compraService.crearCompra(facturaRequest, tienda);
+	public ResponseEntity<RespuestaApi> crearCompra(@PathVariable String uuid, @RequestBody FacturaRequest facturaRequest) {
+	    try {
+	        Tienda tienda = tiendaService.buscarTiendaPorUuid(uuid);
+	        if (tienda == null) {
+	            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                    .body(new RespuestaApi("error", "Tienda no encontrada con UUID: " + uuid, null));
+	        }
 
-            // Devolver la respuesta con la compra creada
-            return ResponseEntity.ok(compra);
-        } catch (EntityNotFoundException e) {
-            // Si la tienda no existe, retornamos un error con un mensaje adecuado
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Tienda no encontrada con UUID: " + uuid);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
-    }
+	        // Llamar al servicio para crear la compra
+	        RespuestaApi respuesta = compraService.crearCompra(facturaRequest, tienda);
+
+	        // Retornar la respuesta del servicio
+	        return ResponseEntity.ok(respuesta);
+
+	    } catch (EntityNotFoundException e) {
+	        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+	                .body(new RespuestaApi("error", e.getMessage(), null));
+	    } catch (IllegalArgumentException e) {
+	        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+	                .body(new RespuestaApi("error", e.getMessage(), null));
+	    } catch (Exception e) {
+	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+	                .body(new RespuestaApi("error", "Ocurrió un error inesperado: " + e.getMessage(), null));
+	    }
+	}
+
 }

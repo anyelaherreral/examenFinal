@@ -8,6 +8,8 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import co.edu.ufps.DTOs.RespuestaApi;
+import co.edu.ufps.DTOs.DataFactura;
 import co.edu.ufps.DTOs.FacturaRequest;
 import co.edu.ufps.DTOs.ProductoRequest;
 import co.edu.ufps.DTOs.PagoRequest;
@@ -30,6 +32,7 @@ import co.edu.ufps.repositories.ProductoRepository;
 import co.edu.ufps.repositories.TiendaRepository;
 import co.edu.ufps.repositories.TipoDocumentoRepository;
 import co.edu.ufps.repositories.VendedorRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
 @Service
@@ -69,112 +72,121 @@ public class CompraService {
 	CajeroService cajeroService;
 
 	
-    @Transactional
-    public Compra crearCompra(FacturaRequest facturaRequest, Tienda tienda) {
-        try {
-        	
-            // Crear y guardar la compra
-            Compra compra = new Compra();
-            compra.setImpuestos(facturaRequest.getImpuesto());
-          
-            compra.setFecha(LocalDate.now());
-            compra = compraRepository.save(compra);
-            
-            compra.setTienda(tienda);
-            
-         // Manejo del cliente
-            Cliente cliente;
-            try {
-                cliente = clienteService.getClienteByDocumento(facturaRequest.getCliente().getDocumento());
-            } catch (RuntimeException e) {
-                // Si el cliente no existe, lo creamos
-                Cliente nuevoCliente = new Cliente();
-                nuevoCliente.setDocumento(facturaRequest.getCliente().getDocumento());
-                nuevoCliente.setNombre(facturaRequest.getCliente().getNombre());
-                
-                String tipoDocumentoString = facturaRequest.getCliente().getTipoDocumento();
-                TipoDocumento tipoDocumento = tipoDocumentoRepository.findByNombre(tipoDocumentoString)
-                        .orElseThrow(() -> new RuntimeException("Tipo de documento no encontrado: " + tipoDocumentoString));
-                
-                nuevoCliente.setTipoDocumento(tipoDocumento);                
-                cliente = clienteService.createCliente(nuevoCliente);
+	@Transactional
+    public RespuestaApi crearCompra(FacturaRequest facturaRequest, Tienda tienda) {
+	    try {
+	    	// Validar cliente
+            if (facturaRequest.getCliente() == null) {
+                return new RespuestaApi("error", "No hay información del cliente", null);
             }
-         // Manejar los productos
-            for (ProductoRequest productoRequest : facturaRequest.getProductos()) {
-                Producto producto = productoService.obtenerProductoPorReferencia(productoRequest.getReferencia());
-                if (producto == null) {
-                    throw new RuntimeException("Producto no encontrado con referencia: " + productoRequest.getReferencia());
+
+            // Validar vendedor
+            if (facturaRequest.getVendedor() == null) {
+                return new RespuestaApi("error", "No hay información del vendedor", null);
+            }
+
+            // Validar cajero
+            if (facturaRequest.getCajero() == null) {
+                return new RespuestaApi("error", "No hay información del cajero", null);
+            }
+
+            // Validar productos
+            if (facturaRequest.getProductos() == null || facturaRequest.getProductos().isEmpty()) {
+                return new RespuestaApi("error", "No hay productos asignados para esta compra", null);
+            }
+
+            // Validar medios de pago
+            if (facturaRequest.getMediosPago() == null || facturaRequest.getMediosPago().isEmpty()) {
+                return new RespuestaApi("error", "No hay medios de pagos asignados para esta compra", null);
+            }
+	    	
+	        // Crear la compra
+	        Compra compra = new Compra();
+	        compra.setImpuestos(facturaRequest.getImpuesto());
+	        compra.setFecha(LocalDate.now());
+	        compra.setTienda(tienda);
+
+	        // Manejo del cliente
+	        Cliente cliente = clienteService.buscarOCrearCliente(
+	                facturaRequest.getCliente().getDocumento(),
+	                facturaRequest.getCliente().getTipoDocumento(),
+	                facturaRequest.getCliente()
+	        );
+	        compra.setCliente(cliente);
+
+	        // Asociar al vendedor
+	        Vendedor vendedor = vendedorService.obtenerVendedorPorDocumento(facturaRequest.getVendedor().getDocumento());
+	        if (vendedor == null) {
+                return new RespuestaApi("error", "El vendedor no existe en la tienda", null);
+	        }
+	        compra.setVendedor(vendedor);
+
+	        // Manejo del cajero
+	        Cajero cajero = cajeroService.obtenerCajeroPorToken(facturaRequest.getCajero().getToken());
+	        if (cajero == null) {
+                return new RespuestaApi("error", "El token no corresponde a ningún cajero en la tienda", null);
+	        }
+	        if (!cajero.getTienda().equals(tienda)) {
+                return new RespuestaApi("error", "El cajero no está asignado a esta tienda", null);
+            }
+	        compra.setCajero(cajero);
+
+	        // Calcular el total
+	        Integer total = facturaRequest.getMediosPago().stream()
+	                .mapToInt(PagoRequest::getValor)
+	                .sum();
+	        compra.setTotal(total);
+
+	        // Guardar la compra inicialmente
+	        compra = compraRepository.save(compra);
+
+	        // Manejar los productos
+	        for (ProductoRequest productoRequest : facturaRequest.getProductos()) {
+	            Producto producto = productoService.obtenerProductoPorReferencia(productoRequest.getReferencia());
+	            if (producto == null) {
+                    return new RespuestaApi("error", "La referencia del producto " + productoRequest.getReferencia() + " no existe, por favor revisar los datos", null);
+	            }
+
+	            // Verificar disponibilidad de inventario
+	            if (producto.getCantidad() < productoRequest.getCantidad()) {
+                    return new RespuestaApi("error", "La cantidad a comprar supera el máximo del producto en tienda", null);
+	            }
+
+	            // Actualizar inventario
+	            producto.setCantidad(producto.getCantidad() - productoRequest.getCantidad());
+	            productoService.actualizarProducto(producto.getId(), producto);
+
+	            // Crear y guardar el detalle de compra
+	            DetallesCompra detalle = new DetallesCompra();
+	            detalle.setCompra(compra); // Ahora `compra` ya tiene un ID válido
+	            detalle.setProducto(producto);
+	            detalle.setCantidad(productoRequest.getCantidad());
+	            detalle.setPrecio(producto.getPrecio());
+	            detalle.setDescuento(productoRequest.getDescuento());
+	            detallesCompraService.crearDetalleCompra(detalle);
+	        }
+
+	        // Manejar los medios de pago
+	        for (PagoRequest pagoRequest : facturaRequest.getMediosPago()) {
+	            TipoPago tipoPago = tipoPagoService.obtenerPorNombre(pagoRequest.getTipoPago());
+	            if (tipoPago == null) {
+                    return new RespuestaApi("error", "Tipo de pago no permitido en la tienda", null);
                 }
+	            Pago pago = new Pago();
+	            pago.setTipoPago(tipoPago);
+	            pago.setCompra(compra); // Ahora `compra` ya tiene un ID válido
+	            pago.setTarjetaTipo(pagoRequest.getTipoTarjeta());
+	            pago.setCuotas(pagoRequest.getCuotas());
+	            pago.setValor(pagoRequest.getValor());
+	            pagoService.crearPago(pago);
+	        }
 
-                // Verificar disponibilidad de inventario
-                if (producto.getCantidad() < productoRequest.getCantidad()) {
-                    throw new RuntimeException("Cantidad insuficiente para el producto con referencia: " + productoRequest.getReferencia());
-                }
+	     // Construir la respuesta
+	        DataFactura data = new DataFactura(compra.getId(), compra.getTotal(), compra.getFecha());
+	        return new RespuestaApi("success", "La factura se ha creado correctamente con el número: #" + compra.getId(), data);
 
-                // Actualizar inventario
-                producto.setCantidad(producto.getCantidad() - productoRequest.getCantidad());
-                productoService.actualizarProducto(producto.getId(), producto);
-
-             // Crear y guardar el detalle de compra
-                DetallesCompra detalle = new DetallesCompra();
-                detalle.setCompra(compra);
-                detalle.setProducto(producto);
-                detalle.setCantidad(productoRequest.getCantidad());
-                detalle.setPrecio(producto.getPrecio());
-                detalle.setDescuento(productoRequest.getDescuento());
-                detallesCompraService.crearDetalleCompra(detalle);
-            }
-         // Manejar los medios de pago
-            for (PagoRequest pagoRequest : facturaRequest.getMediosPago()) {
-                TipoPago tipoPago = tipoPagoService.obtenerPorNombre(pagoRequest.getTipoPago());
-
-                Pago pago = new Pago();
-                pago.setTipoPago(tipoPago);
-                pago.setCompra(compra);
-                pago.setTarjetaTipo(pagoRequest.getTipoTarjeta());;
-                pago.setCuotas(pagoRequest.getCuotas());
-                pago.setValor(pagoRequest.getValor());
-                pagoService.crearPago(pago);
-            }            
-         // Asociar al vendedor (se busca por documento)
-            Vendedor vendedor = vendedorService.obtenerVendedorPorDocumento(facturaRequest.getVendedor().getDocumento());
-            if (vendedor == null) {
-                throw new RuntimeException("Vendedor no encontrado con el documento: " + facturaRequest.getVendedor().getDocumento());
-            }
-            compra.setVendedor(vendedor);
-
-            // Asociar al cajero (se busca por token)
-            Cajero cajero = cajeroService.obtenerCajeroPorToken(facturaRequest.getCajero().getToken());
-            if (cajero == null) {
-                throw new RuntimeException("Cajero no encontrado con el token: " + facturaRequest.getCajero().getToken());
-            }
-            compra.setCajero(cajero);
-            
-         // Calcular el total de los medios de pago
-            Integer total = 0;
-            for (PagoRequest pago : facturaRequest.getMediosPago()) {
-                if (pago.getValor() != null) {
-                    total += pago.getValor().intValue();  // Convertimos el valor a int si es necesario
-                }
-            }
-            compra.setTotal(total);
-            
-            
-            // Preparar la respuesta
-            compra.setTotal(total);
-            compra.setFecha(LocalDate.now());
-            compra.setCliente(cliente);
-            compra.setVendedor(vendedor);
-            compra.setCajero(cajero);
-
-            // Guardar la compra en la base de datos y devolver el objeto Compra
-            return guardarCompra(compra);
         } catch (Exception e) {
-            throw new RuntimeException("Error al registrar la compra: " + e.getMessage());
+            return new RespuestaApi("error", e.getMessage(), null);
         }
-    }
-
-    public Compra guardarCompra(Compra compra) {
-        return compraRepository.save(compra);
     }
 }

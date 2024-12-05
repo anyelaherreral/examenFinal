@@ -33,7 +33,7 @@ public class Producto {
     private String descripcion;
 
     @Column(name = "precio", nullable = false, precision = 10, scale = 2)
-    private BigDecimal precio;
+    private Integer precio;
 
 
     @Column(name = "referencia", length = 20)

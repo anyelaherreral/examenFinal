@@ -26,10 +26,10 @@ public class DetallesCompra {
     private Integer cantidad;
 
     @Column(name = "precio", nullable = false, precision = 10, scale = 2)
-    private BigDecimal precio;
+    private Integer precio;
 
     @Column(name = "descuento", precision = 5, scale = 2, columnDefinition = "numeric(5, 2) default 0")
-    private BigDecimal descuento;
+    private Integer descuento;
 
 
     @ManyToOne

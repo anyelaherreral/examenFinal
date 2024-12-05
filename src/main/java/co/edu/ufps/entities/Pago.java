@@ -27,7 +27,7 @@ public class Pago {
     private String tarjetaTipo;
 
     @Column(name = "valor", precision = 10, scale = 2)
-    private BigDecimal valor;
+    private Integer valor;
 
     @Column(name = "cuotas")
     private Integer cuotas;

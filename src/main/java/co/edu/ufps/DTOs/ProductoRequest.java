@@ -8,5 +8,5 @@ import lombok.Data;
 public class ProductoRequest {
 	private String referencia;
     private int cantidad;
-    private BigDecimal descuento;
+    private Integer descuento;
 }
